@@ -2,26 +2,26 @@ package helper
 
 import "time"
 
-type Status string
+type Status int
 
 const (
-	STATUS_UNSPECIFIED Status = "UNSPECIFIED"
-	STATUS_PENDING     Status = "PENDING"
-	STATUS_SENDING     Status = "SENDING"
-	STATUS_SENT        Status = "SENT"
-	STATUS_CANCELLED   Status = "CANCELLED"
-	STATUS_DEAD        Status = "DEAD"
+	StatusUnspecified Status = iota
+	StatusPending
+	StatusSending
+	StatusSent
+	StatusCancelled
+	StatusDead
 )
 
 type Notification struct {
-	id         string
-	recipient  string
-	title      string
-	body       string
-	send_at    time.Time
-	status     Status
-	attempts   int32
-	last_error string
-	created_at time.Time
-	sent_at    time.Time
+	Id        string
+	Recipient string
+	Title     string
+	Body      string
+	LastError string
+	SendAt    time.Time
+	CreatedAt time.Time
+	SentAt    time.Time
+	Status    Status
+	Attempts  int32
 }
