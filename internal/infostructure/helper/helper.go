@@ -1,4 +1,4 @@
-package infostructure
+package helper
 
 import "time"
 
