@@ -9,6 +9,7 @@ import (
 type Status int
 
 const (
+	NoMoreAttempts           = 6
 	StatusUnspecified Status = iota
 	StatusPending
 	StatusSending
@@ -27,7 +28,7 @@ type Notification struct {
 	CreatedAt time.Time
 	SentAt    time.Time
 	Status    Status
-	Attempts  int32
+	Attempts  int
 }
 
 func CanCancel(notification Notification) bool {
@@ -38,12 +39,11 @@ func CanCancel(notification Notification) bool {
 }
 
 func NextAttempt(notification *Notification) {
-	if notification.Attempts == 6 {
+	if notification.Attempts == NoMoreAttempts {
 		notification.Status = StatusDead
 		return
 	}
 	jitter := time.Duration(rand.Intn(10)) * time.Second
 	timer := time.Second*time.Duration(int(math.Pow(2, float64(notification.Attempts)))*30) + jitter
 	notification.SendAt = time.Now().Add(timer)
-	notification.Attempts++
 }
