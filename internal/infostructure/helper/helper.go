@@ -32,7 +32,7 @@ type Notification struct {
 }
 
 func CanCancel(notification Notification) bool {
-	if notification.Status != StatusPending && notification.Attempts != 6 {
+	if notification.Status != StatusPending && notification.Attempts != NoMoreAttempts {
 		return true
 	}
 	return false
