@@ -1,8 +1,10 @@
 package helper
 
 import (
+	"errors"
 	"math"
 	"math/rand"
+	"net/textproto"
 	"time"
 )
 
@@ -46,4 +48,16 @@ func NextAttempt(notification *Notification) {
 	jitter := time.Duration(rand.Intn(10)) * time.Second
 	timer := time.Second*time.Duration(int(math.Pow(2, float64(notification.Attempts)))*30) + jitter
 	notification.SendAt = time.Now().Add(timer)
+}
+
+func IsRequestDead(err error) (bool, error) {
+	var protoError *textproto.Error
+	if errors.As(err, &protoError) {
+		code := protoError.Code
+		if code < 500 {
+			return false, nil
+		}
+		return true, nil
+	}
+	return false, errors.New("error as is not ok")
 }
