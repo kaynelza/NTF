@@ -20,6 +20,8 @@ const (
 	StatusDead
 )
 
+var ErrAsIsNotOK = errors.New("error as is not ok")
+
 type Notification struct {
 	Id        string
 	Recipient string
@@ -34,7 +36,7 @@ type Notification struct {
 }
 
 func CanCancel(notification Notification) bool {
-	if notification.Status != StatusPending && notification.Attempts != NoMoreAttempts {
+	if notification.Status == StatusPending && notification.Attempts != NoMoreAttempts {
 		return true
 	}
 	return false
@@ -59,5 +61,5 @@ func IsRequestDead(err error) (bool, error) {
 		}
 		return true, nil
 	}
-	return false, errors.New("error as is not ok")
+	return false, ErrAsIsNotOK
 }
