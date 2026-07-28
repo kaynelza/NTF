@@ -1,0 +1,53 @@
+syntax = "proto3";
+package notify.v1;
+option go_package = "github.com/s4bb4t/ntf/pkg/notifypb;notifypb";
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/duration.proto";
+
+service NotificationService {
+  rpc Create (CreateRequest) returns (CreateResponse);
+  rpc Cancel (CancelRequest) returns (CancelResponse);
+  rpc Get    (GetRequest)    returns (Notification);
+  rpc List   (ListRequest)   returns (ListResponse);
+}
+
+enum Status {
+  STATUS_UNSPECIFIED = 0;
+  STATUS_PENDING     = 1;  // ждёт отправки (в т.ч. между ретраями)
+  STATUS_SENDING     = 2;  // захвачено воркером прямо сейчас
+  STATUS_SENT        = 3;  // терминальный
+  STATUS_CANCELLED   = 4;  // терминальный
+  STATUS_DEAD        = 5;  // терминальный: попытки исчерпаны
+}
+
+message CreateRequest {
+  string recipient = 1;                    // валидация: RFC 5322
+  string title     = 2;                    // 1..255
+  string body      = 3;                    // 1..64KB
+  oneof schedule {
+    google.protobuf.Timestamp send_at = 4; // всегда UTC
+    google.protobuf.Duration  delay   = 5; // > 0
+  }
+  string idempotency_key = 6;              // опционально
+}
+
+message CreateResponse { string id = 1; google.protobuf.Timestamp send_at = 2; }
+message CancelRequest  { string id = 1; }
+message CancelResponse { Status status = 1; }
+message GetRequest     { string id = 1; }
+message ListRequest    { string recipient = 1; Status status = 2; int32 limit = 3; int32 offset = 4; }
+message ListResponse   { repeated Notification items = 1; int32 total = 2; }
+
+message Notification {
+  string id = 1;
+  string recipient = 2;
+  string title = 3;
+  string body = 4;
+  google.protobuf.Timestamp send_at = 5;
+  Status status = 6;
+  int32  attempts = 7;
+  string last_error = 8;
+  google.protobuf.Timestamp created_at = 9;
+  google.protobuf.Timestamp sent_at = 10;
+}
