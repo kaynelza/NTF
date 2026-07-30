@@ -1,7 +1,8 @@
 package helper
 
 import (
-	"errors"
+	"fmt"
+	"github.com/go-faster/errors"
 	"math"
 	"math/rand"
 	"net/textproto"
@@ -20,7 +21,7 @@ const (
 	StatusDead
 )
 
-var ErrAsIsNotOK = errors.New("error as is not ok")
+var ErrPermanent = errors.New("error as is not ok")
 
 type Notification struct {
 	Id        string
@@ -52,7 +53,7 @@ func NextAttempt(notification *Notification) {
 	notification.SendAt = time.Now().Add(timer)
 }
 
-func IsRequestDead(err error) (bool, error) {
+func IsErrorRetryable(err error) (bool, error) {
 	var protoError *textproto.Error
 	if errors.As(err, &protoError) {
 		code := protoError.Code
@@ -61,5 +62,5 @@ func IsRequestDead(err error) (bool, error) {
 		}
 		return true, nil
 	}
-	return false, ErrAsIsNotOK
+	return false, fmt.Errorf("%w:%w", err, ErrPermanent)
 }
