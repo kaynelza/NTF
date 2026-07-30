@@ -14,11 +14,6 @@ func Test_CanCancel(t *testing.T) {
 		t.Run("can nor cancel", func(t *testing.T) {
 			//Arrange
 			note := Notification{
-				Id:        "",
-				Recipient: "",
-				Title:     "",
-				Body:      "",
-				LastError: "",
 				SendAt:    time.Time{},
 				CreatedAt: time.Time{},
 				SentAt:    time.Time{},
@@ -40,11 +35,6 @@ func Test_CanCancel(t *testing.T) {
 		t.Run("ok", func(t *testing.T) {
 			//Arrange
 			note := Notification{
-				Id:        "",
-				Recipient: "",
-				Title:     "",
-				Body:      "",
-				LastError: "",
 				SendAt:    time.Time{},
 				CreatedAt: time.Time{},
 				SentAt:    time.Time{},
@@ -67,11 +57,6 @@ func Test_NextAttempt(t *testing.T) {
 		t.Run("attempts are maxed", func(t *testing.T) {
 			//Arrange
 			note := Notification{
-				Id:        "",
-				Recipient: "",
-				Title:     "",
-				Body:      "",
-				LastError: "",
 				SendAt:    time.Time{},
 				CreatedAt: time.Time{},
 				SentAt:    time.Time{},
@@ -93,11 +78,6 @@ func Test_NextAttempt(t *testing.T) {
 		t.Run("ok", func(t *testing.T) {
 			//Arrange
 			note := Notification{
-				Id:        "",
-				Recipient: "",
-				Title:     "",
-				Body:      "",
-				LastError: "",
 				SendAt:    time.Date(2013, time.October, 13, 0, 0, 0, 0, time.UTC),
 				CreatedAt: time.Time{},
 				SentAt:    time.Time{},
@@ -115,15 +95,15 @@ func Test_NextAttempt(t *testing.T) {
 	})
 }
 
-func Test_IsRequestDead(t *testing.T) {
+func Test_IsErrorRetryable(t *testing.T) {
 	t.Run("negative case", func(t *testing.T) {
 		t.Run("unable to convert types", func(t *testing.T) {
 			//Arrange
 			errorka := errors.New("lol")
-			expectedError := ErrAsIsNotOK
+			expectedError := ErrPermanent
 
 			//Act
-			_, err := IsRequestDead(errorka)
+			_, err := IsErrorRetryable(errorka)
 
 			//Assert
 			assert.ErrorIs(t, expectedError, err)
@@ -140,7 +120,7 @@ func Test_IsRequestDead(t *testing.T) {
 			expRes := false
 
 			//Act
-			res, err := IsRequestDead(errorka)
+			res, err := IsErrorRetryable(errorka)
 
 			//Assert
 			assert.Nil(t, err)
