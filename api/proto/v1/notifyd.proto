@@ -1,6 +1,6 @@
 syntax = "proto3";
 package notify.v1;
-option go_package = "github.com/s4bb4t/ntf/pkg/notifypb;notifypb";
+option go_package = "github.com/kaynelza/NTF/pkg/notifyd/v1";
 
 import "google/protobuf/timestamp.proto";
 import "google/protobuf/duration.proto";
