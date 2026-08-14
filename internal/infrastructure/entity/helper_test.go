@@ -1,4 +1,4 @@
-package helper
+package entity
 
 import (
 	"github.com/go-faster/errors"
@@ -100,7 +100,7 @@ func Test_IsErrorRetryable(t *testing.T) {
 		t.Run("unable to convert types", func(t *testing.T) {
 			//Arrange
 			errorka := errors.New("lol")
-			expectedError := ErrPermanent
+			expectedError := AsIsNotOkay
 
 			//Act
 			_, err := IsErrorRetryable(errorka)
