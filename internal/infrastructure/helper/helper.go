@@ -15,7 +15,7 @@ import (
 type Status int
 
 const (
-	NoMoreAttempts           = 6
+	MaxAttempts              = 6
 	StatusUnspecified Status = iota
 	StatusPending
 	StatusSending
@@ -115,14 +115,14 @@ func StatusToPB(status Status) v1.Status {
 }
 
 func CanCancel(notification Notification) bool {
-	if notification.Status == StatusPending && notification.Attempts != NoMoreAttempts {
+	if notification.Status == StatusPending && notification.Attempts != MaxAttempts {
 		return true
 	}
 	return false
 }
 
 func NextAttempt(notification *Notification) {
-	if notification.Attempts == NoMoreAttempts {
+	if notification.Attempts == MaxAttempts {
 		notification.Status = StatusDead
 		return
 	}
