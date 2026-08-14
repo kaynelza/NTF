@@ -7,7 +7,6 @@ import (
 
 	"github.com/go-faster/errors"
 	"github.com/kaynelza/NTF/internal/infrastructure/entity"
-	"github.com/kaynelza/NTF/internal/infrastructure/helper"
 	v1 "github.com/kaynelza/NTF/pkg/grpc/notifyd/v1"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -21,10 +20,11 @@ type NotificationServiceServer struct {
 }
 
 type Storage interface {
-	CreateNotification(ctx context.Context, notification helper.Notification) (id string, sendAt time.Time, err error)
-	GetStatusByID(ctx context.Context, id string) (notification helper.Notification, err error)
-	GetNotification(ctx context.Context, id string) (notification helper.Notification, err error)
-	ListAllNotifications(ctx context.Context, email string, status helper.Status, limit, offset int) (list []helper.Notification, total int, err error)
+	CreateNotification(ctx context.Context, notification entity.Notification) (id string, sendAt time.Time, err error)
+	GetNotificationByID(ctx context.Context, id string) (notification entity.Notification, err error)
+	GetNotification(ctx context.Context, id string) (notification entity.Notification, err error)
+	ListAllNotifications(ctx context.Context, email string, status entity.Status, limit, offset int) (list []entity.Notification, total int, err error)
+	CancelNotification(ctx context.Context, notification entity.Notification) error
 }
 
 func New() (*NotificationServiceServer, error) {
@@ -43,7 +43,7 @@ func (n *NotificationServiceServer) Create(ctx context.Context, request *v1.Crea
 		return nil, n.newError(errors.Wrap(err, "request validation"))
 	}
 
-	id, sendAt, err := n.repo.CreateNotification(ctx, helper.Notification{
+	id, sendAt, err := n.repo.CreateNotification(ctx, entity.Notification{
 		Recipient: request.Recipient,
 		Title:     request.Title,
 		Body:      request.Body,
@@ -64,16 +64,20 @@ func (n *NotificationServiceServer) Cancel(ctx context.Context, request *v1.Canc
 		return nil, n.newError(errors.Wrap(err, "request validation"))
 	}
 
-	notification, err := n.repo.GetStatusByID(ctx, request.Id)
+	notification, err := n.repo.GetNotificationByID(ctx, request.Id)
 	if err != nil {
 		return nil, n.newError(errors.Wrap(err, "cancel notification"))
 	}
 
-	if !helper.CanCancel(notification) {
+	if !entity.CanCancel(notification) {
 		return nil, n.newError(errors.New("impossible to cancel notification"))
 	}
 
-	return &v1.CancelResponse{Status: helper.StatusToPB(notification.Status)}, nil
+	if err := n.repo.CancelNotification(ctx, notification); err != nil {
+		return nil, n.newError(errors.Wrap(err, "failed to cancel notification"))
+	}
+
+	return &v1.CancelResponse{Status: entity.StatusToPB(notification.Status)}, nil
 }
 
 func (n *NotificationServiceServer) Get(ctx context.Context, request *v1.GetRequest) (*v1.Notification, error) {
@@ -86,22 +90,23 @@ func (n *NotificationServiceServer) Get(ctx context.Context, request *v1.GetRequ
 		return nil, n.newError(errors.Wrap(err, "get info about notification"))
 	}
 
-	return helper.NotificationToPB(notification), nil
+	return entity.NotificationToPB(&notification), nil
 }
 
 func (n *NotificationServiceServer) List(ctx context.Context, request *v1.ListRequest) (*v1.ListResponse, error) {
-	if request.Limit > 1000 {
-		request.Limit = 1000
+	err := n.validateListReq(request.Recipient, request.Limit)
+	if err != nil {
+		return nil, n.newError(errors.Wrap(err, "request validation"))
 	}
 
-	list, total, err := n.repo.ListAllNotifications(ctx, request.Recipient, helper.StatusFromPB(request.Status), int(request.Limit), int(request.Offset))
+	list, total, err := n.repo.ListAllNotifications(ctx, request.Recipient, entity.StatusFromPB(request.Status), int(request.Limit), int(request.Offset))
 	if err != nil {
 		return nil, n.newError(errors.Wrap(err, "list all notifications"))
 	}
 
 	var listPB []*v1.Notification
 	for _, v := range list {
-		listPB = append(listPB, helper.NotificationToPB(v))
+		listPB = append(listPB, entity.NotificationToPB(&v))
 	}
 
 	return &v1.ListResponse{
@@ -149,9 +154,13 @@ func (n *NotificationServiceServer) validateGetReq(id string) error {
 	return nil
 }
 
-func (n *NotificationServiceServer) validateListReq(email string) error {
+func (n *NotificationServiceServer) validateListReq(email string, limit int32) error {
 	if !n.emailRegexp.MatchString(email) {
-		errors.New("request validation")
+		return errors.New("request validation")
+	}
+
+	if limit > 1000 {
+		return errors.New("exceeded")
 	}
 	return nil
 }
