@@ -1,4 +1,4 @@
-package helper
+package entity
 
 import (
 	"fmt"
@@ -24,7 +24,7 @@ const (
 	StatusDead
 )
 
-var ErrPermanent = errors.New("error as is not ok")
+var AsIsNotOkay = errors.New("error as is not ok")
 
 type Notification struct {
 	Id        string
@@ -39,9 +39,9 @@ type Notification struct {
 	Attempts  int
 }
 
-func NotificationFromPB(n *v1.Notification) Notification {
+func NotificationFromPB(n *v1.Notification) *Notification {
 	status := StatusFromPB(n.Status)
-	return Notification{
+	return &Notification{
 		Id:        n.GetId(),
 		Recipient: n.GetRecipient(),
 		Title:     n.GetTitle(),
@@ -55,7 +55,7 @@ func NotificationFromPB(n *v1.Notification) Notification {
 	}
 }
 
-func NotificationToPB(n Notification) *v1.Notification {
+func NotificationToPB(n *Notification) *v1.Notification {
 	return &v1.Notification{
 		Id:        n.Id,
 		Recipient: n.Recipient,
@@ -140,5 +140,5 @@ func IsErrorRetryable(err error) (bool, error) {
 		}
 		return true, nil
 	}
-	return false, fmt.Errorf("%w:%w", err, ErrPermanent)
+	return false, fmt.Errorf("%w:%w", err, AsIsNotOkay)
 }
