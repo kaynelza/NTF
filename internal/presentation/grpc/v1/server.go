@@ -69,7 +69,7 @@ func (n *NotificationServiceServer) Cancel(ctx context.Context, request *v1.Canc
 	}
 
 	if !entity.CanCancel(notification) {
-		return nil, n.newError(entity.ErrInvalidArgument)
+		return nil, n.newError(entity.ErrFailedPrecondition)
 	}
 
 	if err := n.repo.CancelNotification(ctx, notification.Id); err != nil {
@@ -159,7 +159,7 @@ func (n *NotificationServiceServer) validateListReq(request *v1.ListRequest) err
 	}
 
 	if request.Limit > 1000 {
-		return errors.Wrap(entity.ErrDeadlineExceeded, "given limit is over 1000")
+		return errors.Wrap(entity.ErrInvalidArgument, "given limit is over 1000")
 	}
 	return nil
 }
