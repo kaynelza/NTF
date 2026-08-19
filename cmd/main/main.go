@@ -20,7 +20,7 @@ func main() {
 }
 
 func start() error {
-	server := v1.New()
+	var server *v1.NotificationServiceServer
 
 	if err := run(server); err != nil {
 		return errors.Wrap(err, "run")
