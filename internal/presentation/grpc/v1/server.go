@@ -22,7 +22,7 @@ type NotificationServiceServer struct {
 type Storage interface {
 	CreateNotification(ctx context.Context, notification entity.Notification) (id string, sendAt time.Time, err error)
 	GetNotificationByID(ctx context.Context, id string) (notification entity.Notification, err error)
-	ListAllNotifications(ctx context.Context, email string, status entity.Status, limit, offset int) (list []entity.Notification, total int, err error)
+	ListAllNotifications(ctx context.Context, recipient string, status entity.Status, limit, offset int) (list []entity.Notification, total int, err error)
 	CancelNotification(ctx context.Context, id string) error
 }
 
