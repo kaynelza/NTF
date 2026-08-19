@@ -23,7 +23,7 @@ type Storage interface {
 	CreateNotification(ctx context.Context, notification entity.Notification) (id string, sendAt time.Time, err error)
 	GetNotificationByID(ctx context.Context, id string) (notification entity.Notification, err error)
 	ListAllNotifications(ctx context.Context, email string, status entity.Status, limit, offset int) (list []entity.Notification, total int, err error)
-	CancelNotification(ctx context.Context, notification entity.Notification) error
+	CancelNotification(ctx context.Context, id string) error
 }
 
 func New() (*NotificationServiceServer, error) {
@@ -72,7 +72,7 @@ func (n *NotificationServiceServer) Cancel(ctx context.Context, request *v1.Canc
 		return nil, n.newError(entity.ErrInvalidArgument)
 	}
 
-	if err := n.repo.CancelNotification(ctx, notification); err != nil {
+	if err := n.repo.CancelNotification(ctx, notification.Id); err != nil {
 		return nil, n.newError(errors.Wrap(err, "failed to cancel notification"))
 	}
 
@@ -141,25 +141,25 @@ func (n *NotificationServiceServer) validateCreateReq(req *v1.CreateRequest) err
 
 func (n *NotificationServiceServer) validateCancelReq(request *v1.CancelRequest) error {
 	if request.Id == "" {
-		return errors.New("id is invalid")
+		return errors.Wrap(entity.ErrInvalidArgument, "id is invalid")
 	}
 	return nil
 }
 
 func (n *NotificationServiceServer) validateGetReq(request *v1.GetRequest) error {
 	if request.Id == "" {
-		return errors.New("id is invalid")
+		return errors.Wrap(entity.ErrInvalidArgument, "id is invalid")
 	}
 	return nil
 }
 
 func (n *NotificationServiceServer) validateListReq(request *v1.ListRequest) error {
 	if !n.emailRegexp.MatchString(request.Recipient) {
-		return errors.New("request validation")
+		return errors.Wrap(entity.ErrInvalidArgument, "email is invalid")
 	}
 
 	if request.Limit > 1000 {
-		return errors.New("exceeded")
+		return errors.Wrap(entity.ErrDeadlineExceeded, "given limit is over 1000")
 	}
 	return nil
 }
