@@ -8,6 +8,7 @@ import (
 	"github.com/go-faster/errors"
 	"github.com/kaynelza/NTF/internal/infrastructure/entity"
 	v1 "github.com/kaynelza/NTF/pkg/grpc/notifyd/v1"
+	"go.uber.org/zap"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -17,13 +18,16 @@ type NotificationServiceServer struct {
 	v1.UnimplementedNotificationServiceServer
 	emailRegexp *regexp.Regexp
 	repo        Storage
+	log         *zap.Logger
 }
 
 type Storage interface {
 	CreateNotification(ctx context.Context, notification entity.Notification) (id string, sendAt time.Time, err error)
-	GetNotificationByID(ctx context.Context, id string) (notification entity.Notification, err error)
-	ListAllNotifications(ctx context.Context, email string, status entity.Status, limit, offset int) (list []entity.Notification, total int, err error)
-	CancelNotification(ctx context.Context, id string) error
+	GetNotificationByID(ctx context.Context, tx entity.Transaction, id string) (notification entity.Notification, err error)
+	ListAllNotifications(ctx context.Context, tx entity.Transaction, recipient string, status entity.Status, limit, offset int) (list []entity.Notification, total int, err error)
+	CancelNotification(ctx context.Context, tx entity.Transaction, id string) error
+	BeginTx(ctx context.Context) (entity.Transaction, error)
+	LockNotificationForUpdate(ctx context.Context, tx entity.Transaction, id string) (notification entity.Notification, err error)
 }
 
 func New() (*NotificationServiceServer, error) {
@@ -63,7 +67,18 @@ func (n *NotificationServiceServer) Cancel(ctx context.Context, request *v1.Canc
 		return nil, n.newError(errors.Wrap(err, "request validation"))
 	}
 
-	notification, err := n.repo.GetNotificationByID(ctx, request.Id)
+	tx, err := n.repo.BeginTx(ctx)
+	if err != nil {
+		return nil, n.newError(entity.ErrInternal)
+	}
+
+	defer func() {
+		if err = tx.Rollback(ctx); err != nil {
+			n.log.Error("rollback failed")
+		}
+	}()
+
+	notification, err := n.repo.LockNotificationForUpdate(ctx, tx, request.Id)
 	if err != nil {
 		return nil, n.newError(errors.Wrap(err, "cancel notification"))
 	}
@@ -72,11 +87,11 @@ func (n *NotificationServiceServer) Cancel(ctx context.Context, request *v1.Canc
 		return nil, n.newError(entity.ErrFailedPrecondition)
 	}
 
-	if err := n.repo.CancelNotification(ctx, notification.Id); err != nil {
+	if err := n.repo.CancelNotification(ctx, tx, notification.Id); err != nil {
 		return nil, n.newError(errors.Wrap(err, "failed to cancel notification"))
 	}
 
-	return &v1.CancelResponse{Status: entity.StatusToPB(notification.Status)}, nil
+	return &v1.CancelResponse{Status: entity.StatusToPB(notification.Status)}, tx.Commit(ctx)
 }
 
 func (n *NotificationServiceServer) Get(ctx context.Context, request *v1.GetRequest) (*v1.Notification, error) {
@@ -84,12 +99,23 @@ func (n *NotificationServiceServer) Get(ctx context.Context, request *v1.GetRequ
 		return nil, n.newError(errors.Wrap(err, "request validation"))
 	}
 
-	notification, err := n.repo.GetNotificationByID(ctx, request.Id)
+	tx, err := n.repo.BeginTx(ctx)
+	if err != nil {
+		return nil, n.newError(entity.ErrInternal)
+	}
+
+	defer func() {
+		if err = tx.Rollback(ctx); err != nil {
+			n.log.Error("rollback failed")
+		}
+	}()
+
+	notification, err := n.repo.GetNotificationByID(ctx, tx, request.Id)
 	if err != nil {
 		return nil, n.newError(errors.Wrap(err, "get info about notification"))
 	}
 
-	return entity.NotificationToPB(&notification), nil
+	return entity.NotificationToPB(&notification), tx.Commit(ctx)
 }
 
 func (n *NotificationServiceServer) List(ctx context.Context, request *v1.ListRequest) (*v1.ListResponse, error) {
@@ -98,7 +124,18 @@ func (n *NotificationServiceServer) List(ctx context.Context, request *v1.ListRe
 		return nil, n.newError(errors.Wrap(err, "request validation"))
 	}
 
-	list, total, err := n.repo.ListAllNotifications(ctx, request.Recipient, entity.StatusFromPB(request.Status), int(request.Limit), int(request.Offset))
+	tx, err := n.repo.BeginTx(ctx)
+	if err != nil {
+		return nil, n.newError(entity.ErrInternal)
+	}
+
+	defer func() {
+		if err = tx.Rollback(ctx); err != nil {
+			n.log.Error("rollback failed")
+		}
+	}()
+
+	list, total, err := n.repo.ListAllNotifications(ctx, tx, request.Recipient, entity.StatusFromPB(request.Status), int(request.Limit), int(request.Offset))
 	if err != nil {
 		return nil, n.newError(errors.Wrap(err, "list all notifications"))
 	}
@@ -111,7 +148,7 @@ func (n *NotificationServiceServer) List(ctx context.Context, request *v1.ListRe
 	return &v1.ListResponse{
 		Items: listPB,
 		Total: int32(total),
-	}, nil
+	}, tx.Commit(ctx)
 }
 
 func (n *NotificationServiceServer) validateCreateReq(req *v1.CreateRequest) error {

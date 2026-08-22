@@ -20,7 +20,11 @@ func main() {
 }
 
 func start() error {
-	server := v1.New()
+	server, err := v1.New()
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
 
 	if err := run(server); err != nil {
 		return errors.Wrap(err, "run")

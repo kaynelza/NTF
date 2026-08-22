@@ -1,6 +1,7 @@
 package entity
 
 import (
+	"context"
 	"fmt"
 	"math"
 	"math/rand"
@@ -26,17 +27,22 @@ const (
 
 var AsIsNotOkay = errors.New("error as is not ok")
 
+type Transaction interface {
+	Commit(ctx context.Context) error
+	Rollback(ctx context.Context) error
+}
+
 type Notification struct {
-	Id        string
-	Recipient string
-	Title     string
-	Body      string
-	LastError string
-	SendAt    time.Time
-	CreatedAt time.Time
-	SentAt    time.Time
-	Status    Status
-	Attempts  int
+	Id        string    `db:"id"`
+	Recipient string    `db:"recipient"`
+	Title     string    `db:"title"`
+	Body      string    `db:"body"`
+	LastError string    `db:"last_error"`
+	SendAt    time.Time `db:"send_at"`
+	CreatedAt time.Time `db:"created_at"`
+	SentAt    time.Time `db:"sent_at"`
+	Status    Status    `db:"status"`
+	Attempts  int       `db:"attempts"`
 }
 
 func NotificationFromPB(n *v1.Notification) *Notification {
