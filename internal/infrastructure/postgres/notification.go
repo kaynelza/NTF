@@ -23,21 +23,36 @@ func (s *Storage) CreateNotification(ctx context.Context, notification entity.No
 	return id, sendAt, nil
 }
 
-func (s *Storage) GetNotificationByID(ctx context.Context, id string) (notification entity.Notification, err error) {
+func (s *Storage) GetNotificationByID(ctx context.Context, etx entity.Transaction, id string) (notification entity.Notification, err error) {
+	tx, ok := etx.(pgx.Tx)
+	if !ok {
+		return entity.Notification{}, errors.New("failed to convert types")
+	}
+
 	q := `
 		select id,recipient,title,body,send_at,status,attempts,last_error,created_at,sent_at
 		from ntf.notification
 		where id=$1`
 
-	err = s.db.QueryRow(ctx, q, id).Scan(&notification)
+	row, err := tx.Query(ctx, q, id)
 	if err != nil {
-		return entity.Notification{}, errors.Wrap(entity.ErrInternal, "failed to get notification by id")
+		return entity.Notification{}, errors.Wrap(entity.ErrInternal, "failed to list notification row")
+	}
+
+	notification, err = pgx.CollectOneRow(row, pgx.RowToStructByName[entity.Notification])
+	if err != nil {
+		return entity.Notification{}, errors.Wrap(entity.ErrInternal, "failed to form notification ")
 	}
 
 	return notification, nil
 }
 
-func (s *Storage) ListAllNotifications(ctx context.Context, recipient string, status entity.Status, limit, offset int) (list []entity.Notification, total int, err error) {
+func (s *Storage) ListAllNotifications(ctx context.Context, etx entity.Transaction, recipient string, status entity.Status, limit, offset int) (list []entity.Notification, total int, err error) {
+	tx, ok := etx.(pgx.Tx)
+	if !ok {
+		return nil, 0, errors.New("failed to convert types")
+	}
+
 	q := `
 		select id,recipient,title,body,send_at,status,attempts,last_error,created_at,sent_at
 		from ntf.notification
@@ -45,7 +60,7 @@ func (s *Storage) ListAllNotifications(ctx context.Context, recipient string, st
 		limit $3
 		offset $4`
 
-	rows, err := s.db.Query(ctx, q, recipient, status, limit, offset)
+	rows, err := tx.Query(ctx, q, recipient, status, limit, offset)
 	if err != nil {
 		return nil, 0, errors.Wrap(entity.ErrInternal, "failed to list all notifications")
 	}
@@ -58,13 +73,18 @@ func (s *Storage) ListAllNotifications(ctx context.Context, recipient string, st
 	return list, len(list), nil
 }
 
-func (s *Storage) CancelNotification(ctx context.Context, id string) error {
+func (s *Storage) CancelNotification(ctx context.Context, etx entity.Transaction, id string) error {
+	tx, ok := etx.(pgx.Tx)
+	if !ok {
+		return errors.New("failed to convert types")
+	}
+
 	q := `
 		update ntf.notification
 		set status = $1
 		where id = $2`
 
-	_, err := s.db.Exec(ctx, q, entity.StatusCancelled, id)
+	_, err := tx.Exec(ctx, q, entity.StatusCancelled, id)
 	if err != nil {
 		return errors.Wrap(entity.ErrInternal, "failed to cancel notification")
 	}
