@@ -91,3 +91,24 @@ func (s *Storage) CancelNotification(ctx context.Context, etx entity.Transaction
 
 	return nil
 }
+
+func (s *Storage) LockNotificationForUpdate(ctx context.Context, etx entity.Transaction, id string) (notification entity.Notification, err error) {
+	tx, ok := etx.(pgx.Tx)
+	if !ok {
+		return entity.Notification{}, errors.New("failed to convert types")
+	}
+
+	q := `
+		select id, recipient, title, body, send_at, status, attempts, last_error, created_at, sent_at
+		from ntf.notification 
+		where id = $1
+		for update skip locked`
+
+	row, err := tx.Query(ctx, q, id)
+	if err != nil {
+		return entity.Notification{}, errors.Wrap(entity.ErrInternal, "failed to lock notification")
+	}
+	notification, err = pgx.CollectOneRow(row, pgx.RowToStructByName[entity.Notification])
+
+	return notification, nil
+}
