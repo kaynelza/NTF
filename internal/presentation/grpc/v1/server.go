@@ -27,6 +27,7 @@ type Storage interface {
 	ListAllNotifications(ctx context.Context, tx entity.Transaction, recipient string, status entity.Status, limit, offset int) (list []entity.Notification, total int, err error)
 	CancelNotification(ctx context.Context, tx entity.Transaction, id string) error
 	BeginTx(ctx context.Context) (entity.Transaction, error)
+	LockNotificationForUpdate(ctx context.Context, tx entity.Transaction, id string) (notification entity.Notification, err error)
 }
 
 func New() (*NotificationServiceServer, error) {
@@ -77,7 +78,7 @@ func (n *NotificationServiceServer) Cancel(ctx context.Context, request *v1.Canc
 		}
 	}()
 
-	notification, err := n.repo.GetNotificationByID(ctx, tx, request.Id)
+	notification, err := n.repo.LockNotificationForUpdate(ctx, tx, request.Id)
 	if err != nil {
 		return nil, n.newError(errors.Wrap(err, "cancel notification"))
 	}
